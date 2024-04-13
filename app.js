@@ -1,10 +1,17 @@
+// app.js
+
 const express = require('express');
-const apiRoutes = require('./api');
+const apiRouter = require('./api');
 
 const app = express();
 
-app.use('/api', apiRoutes);
+// Middleware
+app.use(express.json());
 
+// Mount API routes
+app.use('/api', apiRouter);
+
+// Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

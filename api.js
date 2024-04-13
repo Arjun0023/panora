@@ -1,60 +1,75 @@
+// api.js
+
 const express = require('express');
-const bodyParser = require('body-parser');
-const { User } = require('./db');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const { User, InviteLink } = require('./db');
 
 const router = express.Router();
-router.use(bodyParser.json());
 
-// Signup endpoint
+// Sign Up endpoint
 router.post('/signup', async (req, res) => {
+  const { crypto_wallet_id, password, invite_link } = req.body;
+
   try {
-    const { username, email, password, inviteLink } = req.body;
+    // Find invite link
+    const invite = await InviteLink.findOne({ where: { code: invite_link } });
 
-    if (inviteLink) {
-      const sender = await User.findOne({ inviteLink });
-      if (sender) {
-        sender.points += 5;
-        await sender.save();
-      }
+    // Check if invite link is valid and has uses remaining
+    if (!invite || invite.uses_remaining <= 0) {
+      return res.status(400).json({ error: 'Invalid invite link or link has been used' });
     }
-    const newInviteLink = generateUniqueInviteLink();
-    const newUser = new User({
-      username,
-      email,
-      password,
-      inviteLink: newInviteLink,
-      points: 0
-    });
-    await newUser.save();
 
-    res.status(201).json({ message: 'User signed up successfully' });
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user and link to invite link
+    const user = await User.create({ crypto_wallet_id, password: hashedPassword });
+    await invite.addUser(user);
+
+    // Decrement uses remaining for invite link
+    await invite.decrement('uses_remaining');
+
+    return res.status(200).json({ message: 'User signed up successfully' });
   } catch (error) {
-    console.error('Error signing up user:', error);
-    res.status(500).json({ error: 'An error occurred while signing up' });
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Signin endpoint
+// Sign In endpoint
 router.post('/signin', async (req, res) => {
+  const { crypto_wallet_id, password } = req.body;
+
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    // Find user by crypto wallet ID
+    const user = await User.findOne({ where: { crypto_wallet_id } });
+
+    // Check if user exists
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
-    if (password !== user.password) {
-      return res.status(401).json({ error: 'Invalid password' });
+
+    // Compare passwords
+    const passwordMatch = await bcrypt.compare(password, user.password);
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
-    res.status(200).json({ user });
+
+    // Generate JWT token
+    const token = jwt.sign({ userId: user.id }, 'your_secret_key', { expiresIn: '1h' });
+
+    return res.status(200).json({ token });
   } catch (error) {
-    console.error('Error signing in user:', error);
-    res.status(500).json({ error: 'An error occurred while signing in' });
+    console.error(error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-function generateUniqueInviteLink() {
-  const randomString = Math.random().toString(36).substring(7);
-  return `http://example.com/invite/${randomString}`;
-}
+// Transaction endpoint
+router.post('/transaction', async (req, res) => {
+  // Implementation for user transaction
+});
 
 module.exports = router;

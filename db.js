@@ -1,47 +1,29 @@
 // db.js
 
-const { Sequelize, DataTypes } = require('sequelize');
+const mongoose = require('mongoose');
 
-// Initialize Sequelize with SQLite
-const sequelize = new Sequelize({
-  dialect: 'sqlite',
-  storage: 'database.sqlite' // You can change the file name and path as needed
+mongoose.connect('mongodb://localhost:27017/crypto_app', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+}).then(() => console.log('Connected to MongoDB'))
+  .catch(error => console.error('MongoDB connection error:', error));
+
+const userSchema = new mongoose.Schema({
+  crypto_wallet_id: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  balance: { type: Number, default: 0 }
 });
 
-// Define User model
-const User = sequelize.define('User', {
-  crypto_wallet_id: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true
-  },
-  balance: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 0
-  }
+const inviteLinkSchema = new mongoose.Schema({
+  code: { type: String, required: true, unique: true },
+  uses_remaining: { type: Number, default: 1 },
+  inviter_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 
-// Define InviteLink model
-const InviteLink = sequelize.define('InviteLink', {
-  code: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true
-  },
-  uses_remaining: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 1
-  }
-});
-
-// Define associations
-User.belongsTo(InviteLink);
-InviteLink.hasMany(User);
+const User = mongoose.model('User', userSchema);
+const InviteLink = mongoose.model('InviteLink', inviteLinkSchema);
 
 module.exports = {
-  sequelize,
   User,
   InviteLink
 };

@@ -6,13 +6,22 @@ const router = express.Router();
 
 router.post('/signup', async (req, res) => {
   try {
-    const { walletId, password } = req.body;
-    
-    // Generate a unique invite link for each user
-    const inviteLink = generateInviteLink();
+    const { walletId, password, inviteLink } = req.body;
+
+    // Generate a unique invite link for each user if not provided
+    const generatedInviteLink = inviteLink || generateInviteLink();
+
+    // Check if inviteLink is provided and find the user with that invite link
+    const inviter = inviteLink ? await User.findOne({ inviteLink }) : null;
 
     // Create a new user with the provided data and generated invite link
-    const newUser = new User({ walletId, password, inviteLink });
+    const newUser = new User({ walletId, password, inviteLink: generatedInviteLink });
+
+    // Set a common ID between users who sign up using the same invite link
+    if (inviter) {
+      newUser.commonId = inviter.commonId || uuidv4();
+    }
+
     await newUser.save();
 
     res.status(201).json(newUser);
@@ -24,8 +33,8 @@ router.post('/signup', async (req, res) => {
 
 // Function to generate a unique invite link
 function generateInviteLink() {
-  // Generate a unique identifier (you can use UUID or any other method)
-  const uniqueId = generateUniqueId();
+  // Generate a unique identifier using uuid
+  const uniqueId = uuidv4();
 
   // Example: Concatenate a base URL with the unique identifier
   const baseUrl = 'http://example.com/invite/';
@@ -54,7 +63,14 @@ router.post('/transaction', async (req, res) => {
     const { walletId, amount } = req.body;
     const user = await User.findOne({ walletId });
     if (user) {
+      // Add 5 points to the user's points
       await User.updateOne({ _id: user._id }, { $inc: { points: amount } });
+
+      // Check if there's a commonId and update points for all users with the same commonId
+      if (user.commonId) {
+        await User.updateMany({ commonId: user.commonId }, { $inc: { points: amount } });
+      }
+
       res.json({ message: 'Transaction successful' });
     } else {
       res.status(404).json({ message: 'User not found' });

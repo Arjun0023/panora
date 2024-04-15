@@ -9,7 +9,7 @@ mongoose.connect('mongodb://localhost:27017/newPanora', {
 const userSchema = new mongoose.Schema({
   id: { type: String, unique: true },
   password: String,
-  inviteLink: { type: String, unique: true, sparse: true },
+  commonId: String,
   points: { type: Number, default: 0 },
 });
 

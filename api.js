@@ -63,15 +63,26 @@ router.post('/transaction', async (req, res) => {
     const { walletId, amount } = req.body;
     const user = await User.findOne({ walletId });
     if (user) {
-      // Add 5 points to the user's points
-      await User.updateOne({ _id: user._id }, { $inc: { points: amount } });
-
-      // Check if there's a commonId and update points for all users with the same commonId
+      // Check if there's a commonId associated with the user
       if (user.commonId) {
-        await User.updateMany({ commonId: user.commonId }, { $inc: { points: amount } });
-      }
+        // Find the inviter (user with the same commonId)
+        const inviter = await User.findOne({ commonId: user.commonId });
+        if (inviter) {
+          // Add 5 points to the user's points
+          await User.updateOne({ _id: user._id }, { $inc: { points: amount } });
 
-      res.json({ message: 'Transaction successful' });
+          // Add 5 points to the inviter's points
+          await User.updateOne({ _id: inviter._id }, { $inc: { points: amount } });
+
+          res.json({ message: 'Transaction successful' });
+        } else {
+          res.status(404).json({ message: 'Inviter not found' });
+        }
+      } else {
+        // If no commonId is associated, only add points to the user's account
+        await User.updateOne({ _id: user._id }, { $inc: { points: amount } });
+        res.json({ message: 'Transaction successful' });
+      }
     } else {
       res.status(404).json({ message: 'User not found' });
     }

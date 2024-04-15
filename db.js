@@ -1,18 +1,18 @@
+// db.js
 const mongoose = require('mongoose');
 
-mongoose.connect('mongodb://localhost:27017/panora', {
+mongoose.connect('mongodb://localhost:27017/yourDatabaseName', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
 
 const userSchema = new mongoose.Schema({
-  walletId: String,
+  id: { type: String, unique: true },
   password: String,
-  inviteLink: String,
-  commonUUID: String,
-  points: Number,
+  inviteLink: { type: String, unique: true, sparse: true },
+  points: { type: Number, default: 0 },
 });
 
-const User = mongoose.model('User', userSchema);
+const UserModel = mongoose.model('User', userSchema);
 
-module.exports = { User };
+module.exports = { UserModel };

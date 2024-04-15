@@ -6,8 +6,31 @@ const { UserModel } = require('./db');
 router.post('/signup', async (req, res) => {
   try {
     const { id, password, inviteLink } = req.body;
-    const user = await UserModel.create({ id, password, inviteLink });
-    res.status(201).json(user);
+    let newUser;
+
+    if (inviteLink) {
+      // Check if inviteLink exists
+      const inviter = await UserModel.findOne({ inviteLink });
+      if (inviter) {
+        // If inviteLink exists, create new user and add points to both inviter and new user
+        newUser = await UserModel.create({ id, password, inviteLink });
+        await UserModel.updateOne(
+          { _id: inviter._id },
+          { $inc: { points: 5 } }
+        );
+        await UserModel.updateOne(
+          { _id: newUser._id },
+          { $inc: { points: 5 } }
+        );
+      } else {
+        throw new Error('Invalid invite link');
+      }
+    } else {
+      // If no inviteLink provided, simply create new user
+      newUser = await UserModel.create({ id, password });
+    }
+
+    res.status(201).json(newUser);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

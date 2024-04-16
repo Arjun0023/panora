@@ -1,18 +1,9 @@
 const mongoose = require('mongoose');
 
-mongoose.connect('mongodb://localhost:27017/newPanora2', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect('mongodb://localhost:27017/myapp', { useNewUrlParser: true, useUnifiedTopology: true });
 
-const userSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  pass: { type: String, required: true },
-  points: { type: Number, default: 0 },
-  uniqueInviteLink: { type: String, unique: true },
-  commonInviteLink: { type: String, unique: true },
-});
+const db = mongoose.connection;
 
-const User = mongoose.model('User', userSchema);
+db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 
-module.exports = User;
+module.exports = db;

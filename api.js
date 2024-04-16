@@ -1,123 +1,72 @@
-// api.js
 const express = require('express');
 const router = express.Router();
-const { UserModel } = require('./db');
-
-// Function to generate a random invite link
-const generateInviteLink = () => {
-  return Math.random().toString(36).substring(2, 10); // Generate a random alphanumeric string
-};
+const User = require('./User');
 
 router.post('/signup', async (req, res) => {
   try {
-    const { id, password, inviteLink } = req.body;
-    let newUser;
+    const { id, password, inviteUrl } = req.body;
+    const user = new User({ id, password, inviteUrl });
 
-    if (inviteLink) {
-      // Check if inviteLink exists
-      const inviter = await UserModel.findOne({ inviteLink });
-      if (inviter) {
-        const commonId = Math.random().toString(36).substring(2, 10); // Generate common ID
-        newUser = await UserModel.create({ id, password, commonId });
-        await UserModel.updateOne(
-          { _id: inviter._id },
-          { $inc: { points: 5 } }
-        );
-        await UserModel.updateOne(
-          { _id: newUser._id },
-          { $inc: { points: 5 } }
-        );
-      } else {
-        throw new Error('Invalid invite link');
-      }
-    } else {
-      // Generate invite link for new user
-      const generatedInviteLink = generateInviteLink();
-      newUser = await UserModel.create({ id, password, inviteLink: generatedInviteLink });
+    // Find the user who sent the invite
+    const inviter = await User.findOne({ commonUrl: inviteUrl });
+
+    if (inviter) {
+      user.commonUrl = inviteUrl; // Set common URL same as invite URL sender
+      inviter.points += 5; // Award 5 points to the invite link sender
+      await inviter.save();
+      user.points += 5; // Award 5 points to the new user
     }
 
-    res.status(201).json(newUser);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    await user.save();
+    res.status(201).send('User created successfully');
+  } catch (err) {
+    res.status(400).send(err.message);
   }
 });
 
 router.post('/signin', async (req, res) => {
   try {
     const { id, password } = req.body;
-    const user = await UserModel.findOne({ id, password });
-    if (!user) throw new Error('Invalid credentials');
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(401).json({ error: error.message });const express = require('express');
-    const User = require('./db');
-    
-    const router = express.Router();
-    
-    // Signup endpoint
-    router.post('/signup', async (req, res) => {
-      try {
-        const { id, pass, inviteLink } = req.body;
-        
-        // Check if invite link exists
-        const inviter = await User.findOne({ uniqueInviteLink: inviteLink });
-        if (!inviter) {
-          return res.status(400).json({ message: 'Invalid invite link' });
-        }
-        
-        // Generate common invite link
-        const commonInviteLink = Math.random().toString(36).substring(7);
-    
-        // Create new user
-        const newUser = new User({
-          id,
-          pass,
-          uniqueInviteLink: inviteLink,
-          commonInviteLink,
-        });
-        await newUser.save();
-        
-        return res.status(201).json({ message: 'User created successfully', newUser });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Internal server error' });
-      }
-    });
-    
-    // Transaction endpoint
-    router.post('/transaction', async (req, res) => {
-      try {
-        const { userId, commonId, amount } = req.body;
-        
-        // Update points for users with commonId
-        await User.updateMany({ commonInviteLink: commonId }, { $inc: { points: 5 } });
-        
-        return res.status(200).json({ message: 'Transaction successful' });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Internal server error' });
-      }
-    });
-    
-    module.exports = router;
-    
+    const user = await User.findOne({ id, password });
+
+    if (user) {
+      res.status(200).send('Sign in successful');
+    } else {
+      res.status(401).send('Invalid credentials');
+    }
+  } catch (err) {
+    res.status(400).send(err.message);
   }
 });
-
 router.post('/transaction', async (req, res) => {
   try {
-    const { commonId, points } = req.body;
-    const users = await UserModel.find({ commonId });
-    if (!users || users.length !== 2) throw new Error('Invalid common ID');
+    const { userId, amount } = req.body;
 
-    // Increment points for both users
-    await Promise.all(users.map(user =>
-      UserModel.updateOne({ _id: user._id }, { $inc: { points } })
-    ));
+    // Find the user performing the transaction
+    const user = await User.findById(userId);
 
-    res.status(200).json({ message: 'Transaction completed successfully' });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (user) {
+      // Increment user's points
+      user.points += amount;
+      await user.save();
+
+      // If there's a common URL (invited by someone), find and award points to the inviter
+      if (user.commonUrl) {
+        // Find the inviter (user who sent the invite link)
+        const inviter = await User.findOne({ commonUrl: user.commonUrl });
+        if (inviter) {
+          // Increment inviter's points
+          inviter.points += amount;
+          await inviter.save();
+        }
+      }
+
+      res.status(200).send('Transaction successful');
+    } else {
+      res.status(404).send('User not found');
+    }
+  } catch (err) {
+    res.status(400).send(err.message);
   }
 });
 

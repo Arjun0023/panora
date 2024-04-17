@@ -1,13 +1,20 @@
+// app.js
 const express = require('express');
-const bodyParser = require('body-parser');
-const db = require('./db');
-const apiRouter = require('./api');
+const connectDB = require('./db');
+const apiRoutes = require('./api');
 
 const app = express();
 
-app.use(bodyParser.json());
-app.use('/api', apiRouter);
+// Connect to MongoDB
+connectDB();
 
+// Middleware
+app.use(express.json());
+
+// API routes
+app.use('/api', apiRoutes);
+
+// Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

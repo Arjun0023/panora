@@ -1,22 +1,11 @@
-// db.js
 const mongoose = require('mongoose');
 
-// Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/referral_system', {
+mongoose.connect('mongodb://localhost:27017/data', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
+
 const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 
-// Define User schema
-const userSchema = new mongoose.Schema({
-  id: { type: String, unique: true },
-  password: String,
-  inviteLink: String,
-  points: { type: Number, default: 0 },
-});
-
-// Define User model
-const User = mongoose.model('User', userSchema);
-
-module.exports = { db, User };
+module.exports = db;

@@ -1,50 +1,80 @@
-// api.js
 const express = require('express');
+const User = require('./models/User');
+const Transaction = require('./models/Transaction');
+
 const router = express.Router();
-const { User } = require('./db');
 
-// Signup endpoint
+// User signup route
 router.post('/signup', async (req, res) => {
-  const { id, password, inviteLink } = req.body;
-
   try {
-    // Create a new user
-    const user = new User({ id, password, inviteLink });
+    const { id, password, inviteUrl } = req.body;
 
-    // If there's an invite link, find the sender and update their points
-    if (inviteLink) {
-      const sender = await User.findOne({ inviteLink });
-      if (sender) {
-        sender.points += 5;
-        user.points += 5;
-        await sender.save();
+    // Check if the user was referred by someone
+    let referredByUser = null;
+    if (inviteUrl) {
+      referredByUser = await User.findOne({ inviteUrl });
+      if (!referredByUser) {
+        return res.status(404).json({ message: 'Referring user not found' });
       }
     }
 
-    // Save the new user
-    await user.save();
-    res.status(201).send({ message: 'User created successfully' });
-  } catch (error) {
-    res.status(500).send({ error: error.message });
-  }
-});
+    // Create user
+    const user = new User({ id, password });
 
-// Transactions endpoint
-router.post('/transactions', async (req, res) => {
-  const { id, amount } = req.body;
-
-  try {
-    // Find the user and update their points
-    const user = await User.findOne({ id });
-    if (!user) {
-      return res.status(404).send({ error: 'User not found' });
+    // Set referredBy if user was referred
+    if (referredByUser) {
+      user.referredBy = referredByUser._id;
     }
-    user.points += amount;
+
+    // Save user to database
     await user.save();
-    res.status(200).send({ message: 'Transaction successful' });
+    res.status(201).json({ message: 'User created successfully' });
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+
+
+// Transaction route
+router.post('/transaction', async (req, res) => {
+  try {
+    const { userId, amount, referredBy } = req.body;
+
+    // Find user making the transaction
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Record transaction
+    const transaction = new Transaction({ userId, amount });
+    await transaction.save();
+
+    // Increment user points for the transaction
+    const transactionPoints = 5;
+    user.points += transactionPoints;
+    await user.save();
+
+    // Check if referredBy is provided and valid
+    if (referredBy) {
+      const referringUser = await User.findById(referredBy);
+      if (referringUser) {
+        // Increment points for the referring user
+        referringUser.points += transactionPoints;
+        await referringUser.save();
+      }
+    }
+
+    res.status(201).json({ message: 'Transaction recorded successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+module.exports = router;
+module.exports = router;
 
 module.exports = router;

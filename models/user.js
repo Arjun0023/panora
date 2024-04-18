@@ -25,10 +25,10 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// Generate a unique invite URL for each user upon signup
+
 userSchema.pre('save', function(next) {
   if (!this.inviteUrl) {
-    this.inviteUrl = uuidv4(); // Or generate a hashed version of the user's ID combined with some random characters
+    this.inviteUrl = uuidv4(); 
   }
   next();
 });
